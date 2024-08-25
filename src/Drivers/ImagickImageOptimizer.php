@@ -48,12 +48,12 @@ class ImagickImageOptimizer implements ImageOptimizerInterface
      */
     public function load(string $file): self
     {
-        // Check if the file is a remote URL
         if ($this->isExternalUrl($file)) {
-            $this->file = $this->downloadExternalImage($file);  // Download the file locally
-        } else {
-            $this->file = $file;
+            $file = $this->downloadExternalImage($file);
+            $this->isExternalFile = true;
         }
+
+        $this->file = $file;
 
         try {
             $this->image = new Imagick($this->file);
@@ -86,8 +86,29 @@ class ImagickImageOptimizer implements ImageOptimizerInterface
     public function resize(?int $width, ?int $height): self
     {
         if ($width || $height) {
-            $this->image->resizeImage($width, $height, Imagick::FILTER_LANCZOS, 1, true);
+            $originalWidth = $this->image->getImageWidth();
+            $originalHeight = $this->image->getImageHeight();
+            $aspectRatio = $originalWidth / $originalHeight;
+
+            if ($width && $height) {
+                if ($width / $height > $aspectRatio) {
+                    $newWidth = $height * $aspectRatio;
+                    $newHeight = $height;
+                } else {
+                    $newWidth = $width;
+                    $newHeight = $width / $aspectRatio;
+                }
+            } elseif ($width) {
+                $newWidth = $width;
+                $newHeight = $width / $aspectRatio;
+            } elseif ($height) {
+                $newWidth = $height * $aspectRatio;
+                $newHeight = $height;
+            }
+
+            $this->image->resizeImage($newWidth, $newHeight, Imagick::FILTER_LANCZOS, 1, true);
         }
+
         return $this;
     }
 
@@ -124,7 +145,6 @@ class ImagickImageOptimizer implements ImageOptimizerInterface
 
         $outputData = $this->image->getImageBlob();
 
-        // Ensure the directory exists before saving the image
         $this->ensureDirectoryExists(dirname($outputFile));
 
         // Save the image
@@ -137,6 +157,7 @@ class ImagickImageOptimizer implements ImageOptimizerInterface
         $this->image->destroy();
         return $outputData;
     }
+
 
     /**
      * Determine if the image is a non-photographic image (e.g., logo, icon).

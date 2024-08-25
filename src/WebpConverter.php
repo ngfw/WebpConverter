@@ -31,6 +31,7 @@ class WebpConverter
      * @var string
      */
     protected string $storagePath;
+    protected string $file;
 
     /**
      * The subdirectory for storing WebP images.
@@ -97,12 +98,12 @@ class WebpConverter
      */
     public function load(string $file): self
     {
-        $this->outputFile = $this->getWebpPath($file);
+        $this->file = $file;
+        $this->outputFile = $this->getWebpPath($this->file);
 
-        if ($this->filesystem->exists($this->outputFile)) {
-            return $this;
+        if (!$this->isOutputFileAlreadyCreated()) {
+            $this->optimizer->load($this->file);
         }
-        $this->optimizer->load($file);
         return $this;
     }
 
@@ -173,7 +174,26 @@ class WebpConverter
      */
     public function optimize(): self
     {
-        $this->optimizer->optimize();
+        if (!$this->isOutputFileAlreadyCreated()) {
+            $this->optimizer->optimize();
+        }
+        return $this;
+    }
+
+    /**
+     * Refresh the image by re-downloading it if it has been downloaded already.
+     * 
+     * Calls the `refresh` method on the optimizer, which deletes and re-downloads 
+     * the image if it was previously downloaded. 
+     * 
+     * @return $this
+     */
+    public function refresh(): self
+    {
+        if ($this->isOutputFileAlreadyCreated()) {
+            $this->filesystem->delete($this->outputFile);
+        }
+        $this->optimizer->load($this->file);    
         return $this;
     }
 
@@ -240,6 +260,16 @@ class WebpConverter
     {
         $filename = pathinfo(parse_url($path, PHP_URL_PATH), PATHINFO_FILENAME);
         return "{$this->storagePath}{$this->subDirectory}/{$filename}.webp";
+    }
+
+    /**
+     * Check if the output WebP file already exists in the filesystem.
+     *
+     * @return bool
+     */
+    protected function isOutputFileAlreadyCreated(): bool
+    {
+        return $this->filesystem->exists($this->outputFile);
     }
 
     /**

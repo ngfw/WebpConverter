@@ -52,6 +52,11 @@ class GDImageOptimizer implements ImageOptimizerInterface
      */
     public function load(string $file): self
     {
+        if ($this->isExternalUrl($file)) {
+            $file = $this->downloadExternalImage($file);
+            $this->isExternalFile = true;
+        }
+
         $this->file = $file;
         return $this;
     }
@@ -148,16 +153,31 @@ class GDImageOptimizer implements ImageOptimizerInterface
         $originalHeight = imagesy($image);
         $aspectRatio = $originalWidth / $originalHeight;
 
-        if ($this->width / $this->height > $aspectRatio) {
+        if ($this->width && $this->height) {
+            // Resize based on both width and height provided
+            if ($this->width / $this->height > $aspectRatio) {
+                $newWidth = $this->height * $aspectRatio;
+                $newHeight = $this->height;
+            } else {
+                $newWidth = $this->width;
+                $newHeight = $this->width / $aspectRatio;
+            }
+        } elseif ($this->width) {
+            // Only width is provided, calculate height
+            $newWidth = $this->width;
+            $newHeight = $this->width / $aspectRatio;
+        } elseif ($this->height) {
+            // Only height is provided, calculate width
             $newWidth = $this->height * $aspectRatio;
             $newHeight = $this->height;
         } else {
-            $newWidth = $this->width;
-            $newHeight = $this->width / $aspectRatio;
+            // No resizing if neither width nor height is provided
+            return $image;
         }
 
         return imagescale($image, $newWidth, $newHeight);
     }
+
 
     /**
      * Capture the output of a GD image function.
@@ -243,6 +263,8 @@ class GDImageOptimizer implements ImageOptimizerInterface
         $filename = basename(parse_url($url, PHP_URL_PATH));
         $tempPath = "{$tempDir}/webpconv_{$filename}";
 
+        $this->ensureDirectoryExists($tempDir);
+
         try {
             $response = $client->get($url, ['sink' => $tempPath]);
             if ($response->getStatusCode() !== 200) {
@@ -266,14 +288,15 @@ class GDImageOptimizer implements ImageOptimizerInterface
     {
         $image = $this->createGDImage($this->file);
 
-        if ($this->width && $this->height) {
+        // Check if resizing is necessary
+        if ($this->width || $this->height) {
             $image = $this->resizeGDImageWithAspectRatio($image);
         }
 
+        // Convert the image to WebP format
         $outputData = $this->captureImageOutput(fn() => imagewebp($image, null, $this->quality));
         imagedestroy($image);
 
-        // Ensure the directory exists before saving the image
         $this->ensureDirectoryExists(dirname($outputFile));
 
         // Save the image
