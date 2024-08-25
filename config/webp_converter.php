@@ -38,6 +38,6 @@ return [
 |
 */
 
-'storage_path' => env('WEBP_CONVERTER_STORAGE_PATH', 'public/storage/webp_images'),
+'storage_path' => env('WEBP_CONVERTER_STORAGE_PATH', 'public/webp_images'),
 
 ];

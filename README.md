@@ -48,7 +48,7 @@ return [
     * Storage Path
     */
 
-    'storage_path' => env('WEBP_CONVERTER_STORAGE_PATH', 'public/storage/webp_images'),
+    'storage_path' => env('WEBP_CONVERTER_STORAGE_PATH', 'public/webp_images'),
 ];
 ```
 You can then customize these settings as needed to better fit your application’s requirements.
@@ -61,15 +61,27 @@ Using the WebP Converter is super simple. Here’s how you can integrate it into
 You can load an image from a local path or even a remote URL. The package is smart enough to handle both.
 
 ```php
-use Ngfw\WebpConverter\WebpConverter;
-
-$converter = new WebpConverter($filesystem);
+use Ngfw\WebpConverter\WebpConverterFacade as WebpConverter;
 
 // Load a local image
-$converter->load('/path/to/image.jpg');
+// WebpConverter::load('/path/to/image.jpg');
 
 // Load a remote image
-$converter->load('https://example.com/image.png');
+$imgUrl = "https://images.unsplash.com/photo-1724169913051-49f6ff76a070?q=80&w=3570&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+
+$image = WebpConverter::load($imgUrl)->convert();
+// /storage/webp_images/photo-1724169913051-49f6ff76a070.webp
+```
+
+Example of generating Thumbnail image:
+```php
+$thumbnailUrl = WebpConverter::load($imgUrl)
+        ->width(200)
+        ->quality(70) // Set the quality for optimization
+        ->optimize() // Apply optimization
+        ->saveAs('optimized_thumbnail')
+        ->convert();
+// /storage/webp_images/optimized_thumbnail.webp
 ```
 
 **Setting Quality:**
