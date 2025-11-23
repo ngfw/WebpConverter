@@ -63,17 +63,17 @@ class WebpConverter
     /**
      * Set the image optimizer driver.
      *
-     * @param  string  $driver
+     * @param  string  $driver  The driver to use ('gd' or 'imagick')
      * @return $this
      *
-     * @throws \Exception
+     * @throws \InvalidArgumentException  When an unsupported driver is specified
      */
     public function setDriver(string $driver): self
     {
         $this->optimizer = match ($driver) {
             'gd' => new GDImageOptimizer(),
             'imagick' => new ImagickImageOptimizer(),
-            default => throw new Exception("Unsupported driver: {$driver}"),
+            default => throw new \InvalidArgumentException("Unsupported driver: {$driver}. Supported drivers: gd, imagick"),
         };
         return $this;
     }
@@ -93,8 +93,14 @@ class WebpConverter
     /**
      * Load the image file for conversion.
      *
-     * @param  string  $file
+     * Accepts both local file paths and remote URLs. If the output file already exists,
+     * the optimizer will not be loaded to avoid unnecessary processing.
+     *
+     * @param  string  $file  Path to local file or remote URL
      * @return $this
+     *
+     * @throws \Ngfw\WebpConverter\Exceptions\InvalidImageException  When image cannot be loaded
+     * @throws \Ngfw\WebpConverter\Exceptions\ImageDownloadException  When remote image download fails
      */
     public function load(string $file): self
     {
@@ -110,8 +116,10 @@ class WebpConverter
     /**
      * Set the quality for the WebP conversion.
      *
-     * @param  int  $quality
+     * @param  int  $quality  Quality value between 0 (worst) and 100 (best)
      * @return $this
+     *
+     * @throws \InvalidArgumentException  When quality is not between 0 and 100
      */
     public function quality(int $quality): self
     {
@@ -122,7 +130,9 @@ class WebpConverter
     /**
      * Set the width for the WebP conversion.
      *
-     * @param  int  $width
+     * Height will be automatically calculated to maintain aspect ratio.
+     *
+     * @param  int  $width  Desired width in pixels
      * @return $this
      */
     public function width(int $width): self
@@ -134,7 +144,9 @@ class WebpConverter
     /**
      * Set the height for the WebP conversion.
      *
-     * @param  int  $height
+     * Width will be automatically calculated to maintain aspect ratio.
+     *
+     * @param  int  $height  Desired height in pixels
      * @return $this
      */
     public function height(int $height): self
@@ -181,26 +193,35 @@ class WebpConverter
     }
 
     /**
-     * Refresh the image by re-downloading it if it has been downloaded already.
-     * 
-     * Calls the `refresh` method on the optimizer, which deletes and re-downloads 
-     * the image if it was previously downloaded. 
-     * 
+     * Refresh the image by forcing re-processing.
+     *
+     * Deletes the existing output file if it exists and reloads the source image.
+     * Useful when the source image has been updated or when you want to regenerate
+     * the WebP file with different settings.
+     *
      * @return $this
+     *
+     * @throws \Ngfw\WebpConverter\Exceptions\InvalidImageException  When image cannot be reloaded
+     * @throws \Ngfw\WebpConverter\Exceptions\ImageDownloadException  When remote image download fails
      */
     public function refresh(): self
     {
         if ($this->isOutputFileAlreadyCreated()) {
             $this->filesystem->delete($this->outputFile);
         }
-        $this->optimizer->load($this->file);    
+        $this->optimizer->load($this->file);
         return $this;
     }
 
     /**
-     * Convert the loaded image to WebP format.
+     * Convert the loaded image to WebP format and return the URL.
      *
-     * @return string
+     * If the output file already exists, returns the URL immediately without re-processing.
+     * Otherwise, performs the conversion and saves the file before returning the URL.
+     *
+     * @return string  The URL to the converted WebP image
+     *
+     * @throws \Ngfw\WebpConverter\Exceptions\InvalidImageException  When conversion fails
      */
     public function convert(): string
     {
@@ -275,8 +296,8 @@ class WebpConverter
     /**
      * Serve the WebP image, optionally as a response array.
      *
-     * @param  bool  $asResponse
-     * @return string|array
+     * @param  bool  $asResponse  If true, returns array with headers and content; if false, returns URL
+     * @return string|array<string, mixed>  URL string or array with 'headers' and 'content' keys
      */
     public function serve(bool $asResponse = false): string|array
     {

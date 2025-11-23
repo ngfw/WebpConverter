@@ -69,6 +69,12 @@ Temporary Items
 # Build data
 /build/
 
+### Composer ###
+/vendor/
+
+### Tests ###
+/tests/storage/
+
 ### Windows ###
 # Windows thumbnail cache files
 Thumbs.db
